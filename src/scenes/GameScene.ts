@@ -5,8 +5,13 @@ export class GameScene extends Phaser.Scene {
     private ground!: Phaser.GameObjects.Rectangle
     private cactusGroup!: Phaser.Physics.Arcade.Group
     private gameStatusBox!: Phaser.GameObjects.Text
+    private groundVisual!: Phaser.GameObjects.TileSprite
+
+    private readonly speed = 300
+    private isGameOver = false
 
     private gameOver():void {
+        this.isGameOver = true
         this.physics.pause()
         this.time.paused = true
 
@@ -24,21 +29,16 @@ export class GameScene extends Phaser.Scene {
         }, 1000);
     }
 
-
     private createCactus(bornPos: number):void {
-        const cactus = this.add.circle(
-            this.scale.width,
-            bornPos - 1,
-            Phaser.Math.Between(10, 15),
-            0xff0000
-        )
+        const cactus = this.add.image(this.scale.width, bornPos, 'cactus')
 
         cactus.setOrigin(0.5, 1)
+        cactus.setScale(Phaser.Math.FloatBetween(0.5, 1))
 
         this.cactusGroup.add(cactus)
         const cactusBody = cactus.body as Phaser.Physics.Arcade.Body
         cactusBody.setAllowGravity(false)
-        cactusBody.setVelocityX(-300)
+        cactusBody.setVelocityX(this.speed * -1)
     }
 
 
@@ -52,18 +52,51 @@ export class GameScene extends Phaser.Scene {
 
     preload() {
         this.load.image('dino', '/assets/dino.png')
+        this.load.image('cactus', '/assets/cactus.png')
     }
 
     create() {
+        this.isGameOver = false
         this.time.paused = false
 
         const groundHeight = 50
         const bornPos = this.scale.height - groundHeight
 
         //region ground
-        this.ground = this.add.rectangle(0, this.scale.height - groundHeight, this.scale.width, groundHeight,0x00ff00)
+        this.ground = this.add.rectangle(
+            0,
+            this.scale.height - groundHeight,
+            this.scale.width,
+            groundHeight,
+            0x00ff00
+        )
         this.ground.setOrigin(0, 0)
         this.physics.add.existing(this.ground, true)
+        this.ground.setVisible(false)
+
+
+        const graphics = this.make.graphics({ x: 0, y: 0 })
+
+        graphics.fillStyle(0xF4D35E)
+        graphics.fillRect(0, 0, 128, 50)
+
+        graphics.fillStyle(0xC28E42)
+        graphics.fillRect(15, 10, 20, 3)
+        graphics.fillRect(65, 30, 15, 3)
+        graphics.fillRect(105, 15, 10, 3)
+
+        graphics.generateTexture('groundTexture', 128, 50)
+        graphics.destroy()
+
+        this.groundVisual = this.add.tileSprite(
+            0,
+            this.scale.height - groundHeight,
+            this.scale.width,
+            groundHeight,
+            'groundTexture'
+        )
+
+        this.groundVisual.setOrigin(0, 0)
         //endregion
 
         //region cactusGroup
@@ -71,7 +104,7 @@ export class GameScene extends Phaser.Scene {
 
         const spawnCactus = () => {
             this.time.addEvent({
-                delay: 200,
+                delay: 180,
                 callback: () => {
                     this.createCactus(bornPos)
                 },
@@ -79,7 +112,7 @@ export class GameScene extends Phaser.Scene {
             })
 
             this.time.delayedCall(
-                Phaser.Math.Between(1700, 3000),
+                Phaser.Math.Between(1700, 2500),
                 spawnCactus
             )
         }
@@ -99,9 +132,8 @@ export class GameScene extends Phaser.Scene {
 
 
         //region dino
-        const dinoH = 56
-        this.player = this.add.image(100, bornPos - dinoH, 'dino')
-        this.player.setOrigin(0, 0)
+        this.player = this.add.image(100, bornPos, 'dino')
+        this.player.setOrigin(0.5, 1)
         this.physics.add.existing(this.player)
         //endregion
 
@@ -109,25 +141,14 @@ export class GameScene extends Phaser.Scene {
         //region collider
         this.physics.add.collider(this.player, this.ground)
         this.physics.add.collider(this.cactusGroup, this.ground)
-        //this.physics.add.collider(this.player, this.cactusGroup)
         //endregion
 
-        let isGameOver = false
-
-        this.physics.add.overlap(this.player, this.cactusGroup, (_player, cactus) => {
 
 
-            if (isGameOver) return
-            isGameOver = true
+        this.physics.add.overlap(this.player, this.cactusGroup, () => {
+            if (this.isGameOver) return
+            this.isGameOver = true
 
-            // Отключаем физическое тело конкретного кактуса
-            //const cactusBody = cactus.body as Phaser.Physics.Arcade.Body
-            //cactusBody.enable = false
-
-            // Останавливаем физику
-            //this.physics.pause()
-
-            // Анимация смерти динозаврика
             this.tweens.add({
                 targets: this.player,
                 y: 0,
@@ -152,19 +173,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     update(time: number, delta: number) {
-
-        //const speed = 100
-
-        //this.box.x -= speed * (delta / 1000)
-
-        /*const speed = 100
-
-        if (this.player.x < this.scale.width - this.player.width) {
-            this.player.x += speed * (delta / 1000)
-
-            if (this.player.x > this.scale.width - this.player.width) {
-                this.player.x = this.scale.width - this.player.width
-            }
-        }*/
+        if (this.isGameOver) return
+        this.groundVisual.tilePositionX += this.speed * (delta / 1000)
     }
 }
