@@ -123,7 +123,7 @@ export class GameSceneCatchMoney extends Phaser.Scene {
         //this.bomba.setOrigin(0, 0)
         this.physics.add.existing(this.bomba)
 
-        //region: balls
+        //region balls
         this.ballGroup = this.physics.add.group()
 
         for (let i = 0; i < 10; i++) {
