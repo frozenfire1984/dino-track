@@ -7,8 +7,15 @@ export class GameScene extends Phaser.Scene {
     private gameStatusBox!: Phaser.GameObjects.Text
     private groundVisual!: Phaser.GameObjects.TileSprite
 
-    private readonly speed = 300
+    private speedText!: Phaser.GameObjects.Text
+    private timerText!: Phaser.GameObjects.Text
+    private elapsedTime = 0
+
+    private speed = 200
     private isGameOver = false
+
+    private isPaused = false
+    private pauseButtonText!: Phaser.GameObjects.Text
 
     private gameOver():void {
         this.isGameOver = true
@@ -29,6 +36,24 @@ export class GameScene extends Phaser.Scene {
         }, 1000);
     }
 
+    private togglePause(): void {
+        if (this.isGameOver) return
+
+        this.isPaused = !this.isPaused
+
+        if (this.isPaused) {
+            this.physics.pause()
+            this.time.paused = true
+            this.pauseButtonText.setText("Continue")
+            this.gameStatusBox.setText("Game paused")
+        } else {
+            this.physics.resume()
+            this.time.paused = false
+            this.pauseButtonText.setText("Pause")
+            this.gameStatusBox.setText("Game continue")
+        }
+    }
+
     private createCactus(bornPos: number):void {
         const cactus = this.add.image(this.scale.width, bornPos, 'cactus')
 
@@ -41,12 +66,11 @@ export class GameScene extends Phaser.Scene {
         cactusBody.setVelocityX(this.speed * -1)
     }
 
-
     private jump() {
         const body = this.player.body as Phaser.Physics.Arcade.Body
 
         if (body.blocked.down) {
-            body.setVelocityY(-600)
+            body.setVelocityY(-700)
         }
     }
 
@@ -58,6 +82,8 @@ export class GameScene extends Phaser.Scene {
     create() {
         this.isGameOver = false
         this.time.paused = false
+        this.speed = 200
+        this.isPaused = false
 
         const groundHeight = 50
         const bornPos = this.scale.height - groundHeight
@@ -112,7 +138,7 @@ export class GameScene extends Phaser.Scene {
             })
 
             this.time.delayedCall(
-                Phaser.Math.Between(1700, 2500),
+                Phaser.Math.Between(5100, 6000),
                 spawnCactus
             )
         }
@@ -121,15 +147,33 @@ export class GameScene extends Phaser.Scene {
         //endregion
 
         //region gameStatusBox
-        this.gameStatusBox = this.add.text(300, 100, 'game continue', {
+        this.gameStatusBox = this.add.text(300, 100, 'Game continue', {
             fontSize: '32px',
             color: '#000000',
-            fontFamily: 'Arial'
+            fontFamily: 'Arial',
         })
+
+        const maxWidth = this.gameStatusBox.width
+        this.gameStatusBox.setFixedSize(maxWidth, 40)
+        this.gameStatusBox.setAlign('center')
         this.gameStatusBox.setOrigin(0, 0)
         this.gameStatusBox.setPosition(500, 10)
         //endregion
 
+
+        //region timerText
+        this.elapsedTime = 0
+
+        this.timerText = this.add.text(10, 10, '00:00', {
+            fontSize: '24px',
+            color: '#000000'
+        })
+
+        this.speedText = this.add.text(150, 10, this.speed.toString(), {
+            fontSize: '24px',
+            color: '#000000'
+        })
+        //endregion
 
         //region dino
         this.player = this.add.image(100, bornPos, 'dino')
@@ -137,13 +181,10 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.existing(this.player)
         //endregion
 
-
         //region collider
         this.physics.add.collider(this.player, this.ground)
         this.physics.add.collider(this.cactusGroup, this.ground)
         //endregion
-
-
 
         this.physics.add.overlap(this.player, this.cactusGroup, () => {
             if (this.isGameOver) return
@@ -161,7 +202,6 @@ export class GameScene extends Phaser.Scene {
             this.gameOver()
         })
 
-
         this.input.on('pointerdown', () => {
             this.jump()
         })
@@ -170,10 +210,74 @@ export class GameScene extends Phaser.Scene {
             this.jump()
         })
 
+        this.time.addEvent({
+            delay: 10000,
+            callback: () => {
+
+                if (this.speed >= 250) return
+
+                this.speed += 10
+                this.speedText.setText(this.speed.toString())
+
+                this.cactusGroup.getChildren().forEach((cactus) => {
+                    const body = cactus.body as Phaser.Physics.Arcade.Body
+                    body.setVelocityX(-this.speed)
+                })
+            },
+            loop: true
+        })
+
+        this.input.keyboard?.on('keydown-P', () => {
+            this.togglePause()
+        })
+
+
+        //region pauseButton
+        const pauseButtonBg = this.add.rectangle(0, 0, 120, 40, 0xff0000)
+
+        this.pauseButtonText = this.add.text(0, 0, 'Pause', {
+            fontSize: '20px',
+            color: '#ffffff'
+        })
+
+        this.pauseButtonText.setOrigin(0.5)
+
+        const pauseButton = this.add.container(this.scale.width - 120, 30, [
+            pauseButtonBg,
+            this.pauseButtonText
+        ])
+
+        pauseButton.setSize(120, 40)
+        pauseButton.setInteractive()
+
+        pauseButton.on('pointerdown', (
+            _pointer: Phaser.Input.Pointer,
+            _localX: number,
+            _localY: number,
+            event: Phaser.Types.Input.EventData
+        ) => {
+            event.stopPropagation()
+            this.togglePause()
+        })
+        //endregion
+
     }
 
     update(time: number, delta: number) {
-        if (this.isGameOver) return
+        if (this.isGameOver || this.isPaused) return
         this.groundVisual.tilePositionX += this.speed * (delta / 1000)
+
+
+        this.elapsedTime += delta
+
+        const totalSeconds = Math.floor(this.elapsedTime / 1000)
+        const minutes = Math.floor(totalSeconds / 60)
+        const seconds = totalSeconds % 60
+
+        this.timerText.setText(
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        )
+
+
     }
 }
