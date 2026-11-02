@@ -1,4 +1,8 @@
 import Phaser from 'phaser'
+import { createGround } from "../game/ground.ts";
+import { createObstacles } from "../game/obstacles.ts";
+import { createHud } from "../game/ui.ts";
+import { formatTime } from "../game/utils.ts";
 
 export class GameScene extends Phaser.Scene {
     private player!: Phaser.GameObjects.Image
@@ -11,11 +15,21 @@ export class GameScene extends Phaser.Scene {
     private timerText!: Phaser.GameObjects.Text
     private elapsedTime = 0
 
-    private speed = 200
-    private isGameOver = false
+    private readonly initialSpeed = 200
+    private readonly maxSpeed = 300
+    private readonly speedIncreaseInterval = 10000
+    private readonly speedIncrement = 10
+    private speed = this.initialSpeed
 
+    private groundHeight = 50
+    private bornPos = 0
+
+    private isGameOver = false
     private isPaused = false
+    private pauseButton!: Phaser.GameObjects.Container
     private pauseButtonText!: Phaser.GameObjects.Text
+
+    private removeOffscreenCactuses!: () => void
 
     private gameOver():void {
         this.isGameOver = true
@@ -54,18 +68,6 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    private createCactus(bornPos: number):void {
-        const cactus = this.add.image(this.scale.width, bornPos, 'cactus')
-
-        cactus.setOrigin(0.5, 1)
-        cactus.setScale(Phaser.Math.FloatBetween(0.5, 1))
-
-        this.cactusGroup.add(cactus)
-        const cactusBody = cactus.body as Phaser.Physics.Arcade.Body
-        cactusBody.setAllowGravity(false)
-        cactusBody.setVelocityX(this.speed * -1)
-    }
-
     private jump() {
         const body = this.player.body as Phaser.Physics.Arcade.Body
 
@@ -82,101 +84,33 @@ export class GameScene extends Phaser.Scene {
     create() {
         this.isGameOver = false
         this.time.paused = false
-        this.speed = 200
+        this.speed = this.initialSpeed
         this.isPaused = false
-
-        const groundHeight = 50
-        const bornPos = this.scale.height - groundHeight
-
-        //region ground
-        this.ground = this.add.rectangle(
-            0,
-            this.scale.height - groundHeight,
-            this.scale.width,
-            groundHeight,
-            0x00ff00
-        )
-        this.ground.setOrigin(0, 0)
-        this.physics.add.existing(this.ground, true)
-        this.ground.setVisible(false)
-
-
-        const graphics = this.make.graphics({ x: 0, y: 0 })
-
-        graphics.fillStyle(0xF4D35E)
-        graphics.fillRect(0, 0, 128, 50)
-
-        graphics.fillStyle(0xC28E42)
-        graphics.fillRect(15, 10, 20, 3)
-        graphics.fillRect(65, 30, 15, 3)
-        graphics.fillRect(105, 15, 10, 3)
-
-        graphics.generateTexture('groundTexture', 128, 50)
-        graphics.destroy()
-
-        this.groundVisual = this.add.tileSprite(
-            0,
-            this.scale.height - groundHeight,
-            this.scale.width,
-            groundHeight,
-            'groundTexture'
-        )
-
-        this.groundVisual.setOrigin(0, 0)
-        //endregion
-
-        //region cactusGroup
-        this.cactusGroup = this.physics.add.group()
-
-        const spawnCactus = () => {
-            this.time.addEvent({
-                delay: 180,
-                callback: () => {
-                    this.createCactus(bornPos)
-                },
-                repeat: Phaser.Math.Between(2, 4),
-            })
-
-            this.time.delayedCall(
-                Phaser.Math.Between(5100, 6000),
-                spawnCactus
-            )
-        }
-
-        spawnCactus()
-        //endregion
-
-        //region gameStatusBox
-        this.gameStatusBox = this.add.text(300, 100, 'Game continue', {
-            fontSize: '32px',
-            color: '#000000',
-            fontFamily: 'Arial',
-        })
-
-        const maxWidth = this.gameStatusBox.width
-        this.gameStatusBox.setFixedSize(maxWidth, 40)
-        this.gameStatusBox.setAlign('center')
-        this.gameStatusBox.setOrigin(0, 0)
-        this.gameStatusBox.setPosition(500, 10)
-        //endregion
-
-
-        //region timerText
         this.elapsedTime = 0
+        this.bornPos = this.scale.height - this.groundHeight
 
-        this.timerText = this.add.text(10, 10, '00:00', {
-            fontSize: '24px',
-            color: '#000000'
-        })
+        // ground
+        const { ground, groundVisual } = createGround(this, this.groundHeight)
+        this.ground = ground
+        this.groundVisual = groundVisual
 
-        this.speedText = this.add.text(150, 10, this.speed.toString(), {
-            fontSize: '24px',
-            color: '#000000'
-        })
-        //endregion
+        // cactusGroup
+        const { cactusGroup, removeOffscreenCactuses } = createObstacles(this, this.bornPos,  () => this.speed)
+        this.cactusGroup = cactusGroup
+        this.removeOffscreenCactuses = removeOffscreenCactuses
+
+
+        // gameStatusBox
+        const { gameStatusBox, pauseButton, pauseButtonText, timerText, speedText } = createHud(this, () => this.speed)
+        this.gameStatusBox = gameStatusBox
+        this.pauseButton = pauseButton
+        this.pauseButtonText = pauseButtonText
+        this.timerText = timerText
+        this.speedText = speedText
+        //region timerText
 
         //region dino
-        this.player = this.add.image(100, bornPos, 'dino')
+        this.player = this.add.image(100, this.bornPos, 'dino')
         this.player.setOrigin(0.5, 1)
         this.physics.add.existing(this.player)
         //endregion
@@ -184,7 +118,6 @@ export class GameScene extends Phaser.Scene {
         //region collider
         this.physics.add.collider(this.player, this.ground)
         this.physics.add.collider(this.cactusGroup, this.ground)
-        //endregion
 
         this.physics.add.overlap(this.player, this.cactusGroup, () => {
             if (this.isGameOver) return
@@ -211,12 +144,12 @@ export class GameScene extends Phaser.Scene {
         })
 
         this.time.addEvent({
-            delay: 10000,
+            delay: this.speedIncreaseInterval,
             callback: () => {
 
-                if (this.speed >= 250) return
+                if (this.speed >= this.maxSpeed) return
 
-                this.speed += 10
+                this.speed = Math.min(this.speed + this.speedIncrement, this.maxSpeed)
                 this.speedText.setText(this.speed.toString())
 
                 this.cactusGroup.getChildren().forEach((cactus) => {
@@ -230,27 +163,10 @@ export class GameScene extends Phaser.Scene {
         this.input.keyboard?.on('keydown-P', () => {
             this.togglePause()
         })
-
+        //endregion
 
         //region pauseButton
-        const pauseButtonBg = this.add.rectangle(0, 0, 120, 40, 0xff0000)
-
-        this.pauseButtonText = this.add.text(0, 0, 'Pause', {
-            fontSize: '20px',
-            color: '#ffffff'
-        })
-
-        this.pauseButtonText.setOrigin(0.5)
-
-        const pauseButton = this.add.container(this.scale.width - 120, 30, [
-            pauseButtonBg,
-            this.pauseButtonText
-        ])
-
-        pauseButton.setSize(120, 40)
-        pauseButton.setInteractive()
-
-        pauseButton.on('pointerdown', (
+        this.pauseButton.on('pointerdown', (
             _pointer: Phaser.Input.Pointer,
             _localX: number,
             _localY: number,
@@ -260,24 +176,15 @@ export class GameScene extends Phaser.Scene {
             this.togglePause()
         })
         //endregion
-
     }
 
-    update(time: number, delta: number) {
+    update(_time: number, delta: number) {
         if (this.isGameOver || this.isPaused) return
         this.groundVisual.tilePositionX += this.speed * (delta / 1000)
 
-
         this.elapsedTime += delta
+        this.timerText.setText(formatTime(this.elapsedTime))
 
-        const totalSeconds = Math.floor(this.elapsedTime / 1000)
-        const minutes = Math.floor(totalSeconds / 60)
-        const seconds = totalSeconds % 60
-
-        this.timerText.setText(
-            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-        )
-
-
+        this.removeOffscreenCactuses()
     }
 }
