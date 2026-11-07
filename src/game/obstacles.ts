@@ -15,7 +15,6 @@ export function createObstacles(scene: Phaser.Scene, bornPos: number, getSpeed: 
         cactusBody.setVelocityX(-getSpeed())
     }
 
-
     function removeOffscreenCactuses() :void {
         cactusGroup.getChildren().forEach((child) => {
             const cactus = child as Phaser.GameObjects.Image
@@ -41,7 +40,7 @@ export function createObstacles(scene: Phaser.Scene, bornPos: number, getSpeed: 
         )
     }
 
-    spawnCactus()
+    //spawnCactus()
 
-    return { cactusGroup, removeOffscreenCactuses }
+    return { cactusGroup, removeOffscreenCactuses, spawnCactus }
 }
