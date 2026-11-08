@@ -8,7 +8,8 @@ export class GameScene extends Phaser.Scene {
     private player!: Phaser.GameObjects.Sprite
     private ground!: Phaser.GameObjects.Rectangle
     private cactusGroup!: Phaser.Physics.Arcade.Group
-    private spawnCactus!: () => void
+    private ravenGroup!: Phaser.Physics.Arcade.Group
+    private objectsGenerator!: () => void
 
     private gameStatusBox!: Phaser.GameObjects.Text
     private groundVisual!: Phaser.GameObjects.TileSprite
@@ -26,6 +27,8 @@ export class GameScene extends Phaser.Scene {
     private groundHeight = 50
     private bornPos = 0
 
+    private bornPosForAir = 0
+
     private readonly delayBeforeStart = 3000
     private isDelayBeforeStart = true
     private isGameOver = false
@@ -33,11 +36,12 @@ export class GameScene extends Phaser.Scene {
     private pauseButton!: Phaser.GameObjects.Container
     private pauseButtonText!: Phaser.GameObjects.Text
 
-    private removeOffscreenCactuses!: () => void
+    private removeOffscreenObstacles!: () => void
 
     private gameOver():void {
         this.isGameOver = true
         this.physics.pause()
+        this.anims.pauseAll()
         this.time.paused = true
 
         this.gameStatusBox.setText("Game over!")
@@ -64,12 +68,14 @@ export class GameScene extends Phaser.Scene {
             this.player.anims.pause()
             this.physics.pause()
             this.time.paused = true
+            this.anims.pauseAll()
             this.pauseButtonText.setText("Continue")
             this.gameStatusBox.setText("Game paused")
         } else {
             this.player.anims.resume()
             this.physics.resume()
             this.time.paused = false
+            this.anims.resumeAll()
             this.pauseButtonText.setText("Pause")
             this.gameStatusBox.setText("Game continue")
         }
@@ -87,10 +93,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        //this.load.image('dino', '/assets/dino.png')
-
         this.load.spritesheet('dino', '/assets/dino-sprites.png', {
             frameWidth: 80,
+            frameHeight: 64
+        })
+
+        this.load.spritesheet('raven', '/assets/raven-sprites.png', {
+            frameWidth: 64,
             frameHeight: 64
         })
 
@@ -98,6 +107,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.anims.resumeAll()
         this.isDelayBeforeStart = true
         this.isGameOver = false
         this.time.paused = false
@@ -105,6 +115,7 @@ export class GameScene extends Phaser.Scene {
         this.isPaused = false
         this.elapsedTime = 0
         this.bornPos = this.scale.height - this.groundHeight
+        this.bornPosForAir = 300
 
         // ground
         const { ground, groundVisual } = createGround(this, this.groundHeight)
@@ -112,10 +123,11 @@ export class GameScene extends Phaser.Scene {
         this.groundVisual = groundVisual
 
         // cactusGroup
-        const { cactusGroup, removeOffscreenCactuses, spawnCactus } = createObstacles(this, this.bornPos,  () => this.speed)
+        const { cactusGroup, ravenGroup, removeOffscreenObstacles, objectsGenerator } = createObstacles(this, this.bornPos, this.bornPosForAir,  () => this.speed)
         this.cactusGroup = cactusGroup
-        this.removeOffscreenCactuses = removeOffscreenCactuses
-        this.spawnCactus = spawnCactus
+        this.ravenGroup = ravenGroup
+        this.removeOffscreenObstacles = removeOffscreenObstacles
+        this.objectsGenerator = objectsGenerator
 
 
         // gameStatusBox
@@ -146,8 +158,8 @@ export class GameScene extends Phaser.Scene {
 
         const dinoBody = this.player.body as Phaser.Physics.Arcade.Body
 
-        dinoBody.setSize(68, 54)
-        dinoBody.setOffset(5, 10)
+        dinoBody.setSize(50, 54)
+        dinoBody.setOffset(24, 10)
         dinoBody.updateFromGameObject()
         //endregion
 
@@ -155,21 +167,14 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.ground)
         this.physics.add.collider(this.cactusGroup, this.ground)
 
-        this.physics.add.overlap(this.player, this.cactusGroup, () => {
+        this.physics.add.overlap(this.player, [this.cactusGroup, this.ravenGroup], () => {
             if (this.isGameOver) return
             this.isGameOver = true
 
             this.player.stop()
             this.player.setFrame(9)
 
-            /*this.tweens.add({
-                targets: this.player,
-                y: 0,
-                duration: 400,
-                onComplete: () => {
-                    this.player.destroy()
-                }
-            })*/
+
 
             this.gameOver()
         })
@@ -222,7 +227,7 @@ export class GameScene extends Phaser.Scene {
         this.time.delayedCall(this.delayBeforeStart, () => {
             this.isDelayBeforeStart = false
             this.physics.resume()
-            this.spawnCactus()
+            this.objectsGenerator()
             this.player.play('dino-run')
 
         })
@@ -235,7 +240,7 @@ export class GameScene extends Phaser.Scene {
         this.elapsedTime += delta
         this.timerText.setText(formatTime(this.elapsedTime))
 
-        this.removeOffscreenCactuses()
+        this.removeOffscreenObstacles()
 
         const dinoBody = this.player.body as Phaser.Physics.Arcade.Body
 
