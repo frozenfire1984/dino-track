@@ -69,15 +69,15 @@ export class GameScene extends Phaser.Scene {
             this.physics.pause()
             this.time.paused = true
             this.anims.pauseAll()
-            this.pauseButtonText.setText("Continue")
-            this.gameStatusBox.setText("Game paused")
+            this.pauseButtonText.setText("Продолжить")
+            this.gameStatusBox.setText("Игра остановлена")
         } else {
             this.player.anims.resume()
             this.physics.resume()
             this.time.paused = false
             this.anims.resumeAll()
-            this.pauseButtonText.setText("Pause")
-            this.gameStatusBox.setText("Game continue")
+            this.pauseButtonText.setText("Пауза")
+            this.gameStatusBox.setText("")
         }
     }
 
@@ -93,17 +93,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.spritesheet('dino', '/assets/dino-sprites.png', {
+        this.load.spritesheet('dino', `${import.meta.env.BASE_URL}assets/dino-sprites.png`, {
             frameWidth: 80,
             frameHeight: 64
         })
 
-        this.load.spritesheet('raven', '/assets/raven-sprites.png', {
+        this.load.spritesheet('raven', `${import.meta.env.BASE_URL}assets/raven-sprites.png`, {
             frameWidth: 64,
             frameHeight: 64
         })
 
-        this.load.image('cactus', '/assets/cactus.png')
+        this.load.image('cactus',`${import.meta.env.BASE_URL}assets/cactus.png`)
     }
 
     create() {
@@ -115,7 +115,7 @@ export class GameScene extends Phaser.Scene {
         this.isPaused = false
         this.elapsedTime = 0
         this.bornPos = this.scale.height - this.groundHeight
-        this.bornPosForAir = 300
+        this.bornPosForAir = 400
 
         // ground
         const { ground, groundVisual } = createGround(this, this.groundHeight)
@@ -140,7 +140,6 @@ export class GameScene extends Phaser.Scene {
         //region timerText
 
         //region dino
-        //this.player = this.add.image(100, this.bornPos, 'dino')
         if (!this.anims.exists('dino-run')) {
             this.anims.create({
                 key: 'dino-run',
